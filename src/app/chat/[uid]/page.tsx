@@ -1,68 +1,67 @@
 'use client';
-export const runtime = 'edge'; // or 'force-dynamic' if you prefer
 
-import { useSession } from 'next-auth/react';
-import { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useEffect, useRef, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
-// Dynamic import of JitsiMeeting, SSR disabled
-const JitsiMeeting = dynamic(
-  () => import('@jitsi/react-sdk').then(mod => mod.JitsiMeeting),
-  { ssr: false, loading: () => <p>Loading video…</p> }
-);
-
-// TypeScript type for props
 interface ChatPageProps {
   params: {
-    uid: string;
+    uid: string; // dynamic route [uid]
   };
 }
 
-export default function ChatPage({ params }: ChatPageProps) {
-  const { data: session, status } = useSession();
-  const [showMeet, setShowMeet] = useState(false);
+const ChatPage: React.FC<ChatPageProps> = ({ params }) => {
+  const { uid } = params;
+  const jitsiContainerRef = useRef<HTMLDivElement>(null);
+  const [jitsiApi, setJitsiApi] = useState<any>(null);
 
-  // Compute room name
-  const room = useMemo(() => {
-    if (status !== 'authenticated' || !params.uid) return null;
+  useEffect(() => {
+    const loadJitsi = async () => {
+      if (!jitsiContainerRef.current) return;
 
-    const a = session?.user?.id ?? '';
-    const b = params.uid;
+      const domain = 'meet.jit.si';
+      const options = {
+        roomName: `SkillForSkill-${uid}-${uuidv4()}`, // unique room per chat
+        width: '100%',
+        height: 600,
+        parentNode: jitsiContainerRef.current,
+        interfaceConfigOverwrite: {
+          TOOLBAR_BUTTONS: [
+            'microphone',
+            'camera',
+            'hangup',
+            'chat',
+            'fullscreen',
+            'tileview',
+          ],
+        },
+        configOverwrite: {
+          prejoinPageEnabled: false,
+        },
+      };
 
-    return `match_${[a, b].sort().join('_')}`;
-  }, [status, session?.user?.id, params.uid]);
+      // @ts-ignore
+      const JitsiMeetExternalAPI = (window as any).JitsiMeetExternalAPI;
+      const api = new JitsiMeetExternalAPI(domain, options);
+      setJitsiApi(api);
 
-  if (status === 'loading') return <p>Loading...</p>;
-  if (!room) return <p>Please log in</p>;
+      // Cleanup on unmount
+      return () => api?.dispose();
+    };
+
+    loadJitsi();
+  }, [uid]);
 
   return (
-    <div className="p-8">
-      <h2 className="text-2xl font-bold mb-4">Chat + Video Call</h2>
-
-      <button
-        onClick={() => setShowMeet((v) => !v)}
-        className="bg-green-600 text-white px-4 py-2 rounded mb-4"
-      >
-        {showMeet ? 'Close Video' : 'Start Video Call'}
-      </button>
-
-      {showMeet && (
-        <div className="h-[500px] border rounded">
-          <JitsiMeeting
-            domain="meet.jit.si"
-            roomName={room}
-            configOverwrite={{ startWithAudioMuted: true }}
-            interfaceConfigOverwrite={{ TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup'] }}
-            getIFrameRef={(node: HTMLDivElement | null) => {
-              if (node) {
-                const iframe = node.querySelector('iframe') as HTMLIFrameElement | null;
-                if (iframe) iframe.style.height = '100%';
-              }
-            }}
-          />
-        </div>
-      )}
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold text-gray-800 mb-4">
+        1-to-1 Video Chat with User {uid}
+      </h1>
+      <div
+        ref={jitsiContainerRef}
+        className="w-full rounded-lg overflow-hidden shadow-md"
+      />
     </div>
   );
-}
+};
 
+export default ChatPage;
