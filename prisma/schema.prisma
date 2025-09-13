@@ -1,70 +1,70 @@
 // prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model User {
-  id         String    @id @default(uuid())
-  name       String?
-  email      String?   @unique
-  password   String
-  image      String?
-  karma      Int       @default(0)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String    // needed for login/signup
+  image     String?
+  role      String    // "learner", "teacher", or "both"
+  karma     Int       @default(0)
 
-  skills     Skill[]   @relation("UserSkills")
-  teacherSessions Session[] @relation("TeacherSessions")
-  studentSessions Session[] @relation("StudentSessions")
-  sentMessages    Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  skills    Skill[]   @relation("UserSkills")
+  messagesSent     Message[] @relation("MessagesSent")
+  messagesReceived Message[] @relation("MessagesReceived")
+  sessionsAsTeacher Session[] @relation("TeacherSessions")
+  sessionsAsStudent Session[] @relation("StudentSessions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Skill {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  category    String
-  level       String
-  duration    Float
-  price       Float
-  maxStudents Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int       @id @default(autoincrement())
+  name      String
+  level     String?
+  user      User      @relation("UserSkills", fields: [userId], references: [id])
+  userId    Int
 
-  teacherId   String
-  teacher     User     @relation(fields: [teacherId], references: [id], name: "UserSkills")
-  sessions    Session[]
+  sessions  Session[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Session {
-  id         String   @id @default(uuid())
-  skillId    String
-  skill      Skill    @relation(fields: [skillId], references: [id])
-  teacherId  String
-  teacher    User     @relation("TeacherSessions", fields: [teacherId], references: [id])
-  studentId  String?
-  student    User?    @relation("StudentSessions", fields: [studentId], references: [id])
-  startTime  DateTime
-  endTime    DateTime
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  skill     Skill    @relation(fields: [skillId], references: [id])
+  skillId   Int
+
+  teacher   User     @relation("TeacherSessions", fields: [teacherId], references: [id])
+  teacherId Int
+
+  student   User     @relation("StudentSessions", fields: [studentId], references: [id])
+  studentId Int
+
+  startTime DateTime
+  endTime   DateTime?
+  status    String   @default("pending") // "pending", "confirmed", "completed"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Message {
-  id         String   @id @default(uuid())
-  senderId   String
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiverId String
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  id         Int      @id @default(autoincrement())
   content    String
+  sender     User     @relation("MessagesSent", fields: [senderId], references: [id])
+  senderId   Int
+  receiver   User     @relation("MessagesReceived", fields: [receiverId], references: [id])
+  receiverId Int
+
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
 }
