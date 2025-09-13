@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
-import type { JitsiMeetingProps } from '@jitsi/react-sdk';
 
 /* 1. Load the SDK only on the client */
 const JitsiMeeting = dynamic(
