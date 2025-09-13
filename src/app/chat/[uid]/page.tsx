@@ -1,71 +1,63 @@
 'use client';
+export const runtime = 'edge'; // or 'force-dynamic' if you prefer
 
+import { useSession } from 'next-auth/react';
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { useSession } from 'next-auth/react';
 
-/* 1. Load the SDK only on the client */
+// Dynamic import of JitsiMeeting, SSR disabled
 const JitsiMeeting = dynamic(
-  () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
-  { ssr: false, loading: () => <p className="p-4">Loading video …</p> }
+  () => import('@jitsi/react-sdk').then(mod => mod.JitsiMeeting),
+  { ssr: false, loading: () => <p>Loading video…</p> }
 );
 
-export default function ChatPage({ params }: { params: { uid: string } }) {
+// TypeScript type for props
+interface ChatPageProps {
+  params: {
+    uid: string;
+  };
+}
+
+export default function ChatPage({ params }: ChatPageProps) {
   const { data: session, status } = useSession();
   const [showMeet, setShowMeet] = useState(false);
 
-  /* 2. + 3. Stable room name only when both ids are available */
+  // Compute room name
   const room = useMemo(() => {
-    if (!session?.user?.id || !params.uid) return null;
-    const [a, b] = [session.user.id, params.uid].sort();
-    return `match_${a}_${b}`;
-  }, [session?.user?.id, params.uid]);
+    if (status !== 'authenticated' || !params.uid) return null;
 
-  /* 4. Loading state */
-  if (status === 'loading') {
-    return (
-      <div className="p-4">
-        <h2 className="text-xl font-bold mb-4">Chat + Video Call</h2>
-        <p className="text-sm text-gray-500">Loading session …</p>
-      </div>
-    );
-  }
+    const a = session?.user?.id ?? '';
+    const b = params.uid;
 
-  /* Still need both ids */
-  if (!room) {
-    return (
-      <div className="p-4">
-        <h2 className="text-xl font-bold mb-4">Chat + Video Call</h2>
-        <p className="text-sm text-red-600">
-          Could not create room – missing user information.
-        </p>
-      </div>
-    );
-  }
+    return `match_${[a, b].sort().join('_')}`;
+  }, [status, session?.user?.id, params.uid]);
+
+  if (status === 'loading') return <p>Loading...</p>;
+  if (!room) return <p>Please log in</p>;
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Chat + Video Call</h2>
+    <div className="p-8">
+      <h2 className="text-2xl font-bold mb-4">Chat + Video Call</h2>
 
       <button
         onClick={() => setShowMeet((v) => !v)}
-        className="bg-green-600 text-white px-4 py-2 rounded mb-4 disabled:opacity-50"
-        disabled={status !== 'authenticated'}
+        className="bg-green-600 text-white px-4 py-2 rounded mb-4"
       >
         {showMeet ? 'Close Video' : 'Start Video Call'}
       </button>
 
       {showMeet && (
-        <div className="h-[500px] border rounded overflow-hidden">
+        <div className="h-[500px] border rounded">
           <JitsiMeeting
             domain="meet.jit.si"
             roomName={room}
-            configOverwrite={{
-              startWithAudioMuted: true,
-              disableDeepLinking: true,
-            }}
-            getIFrameRef={(node) => {
-              if (node) node.style.height = '100%';
+            configOverwrite={{ startWithAudioMuted: true }}
+            interfaceConfigOverwrite={{ TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup'] }}
+            getIFrameRef={(node: HTMLDivElement | null) => {
+              if (node) {
+                const iframe = node.querySelector('iframe') as HTMLIFrameElement | null;
+                if (iframe) iframe.style.height = '100%';
+              }
             }}
           />
         </div>
@@ -73,3 +65,4 @@ export default function ChatPage({ params }: { params: { uid: string } }) {
     </div>
   );
 }
+
